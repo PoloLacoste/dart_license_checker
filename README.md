@@ -3,15 +3,14 @@
 Shows you which licenses your dependencies have.
 
 ```
-┌───────────────────────────┐
-│ Package Name  License     │
-├───────────────────────────┤
-│     barbecue  Apache 2.0  │
-│         pana  BSD         │
-│         path  BSD         │
-│pubspec_parse  BSD         │
-│         tint  MIT         │
-└───────────────────────────┘
+┌────────────────────────────┐
+│ Package Name  License      │
+├────────────────────────────┤
+│     barbecue  Apache-2.0   │
+│         pana  BSD-3-Clause │
+│pubspec_parse  BSD-3-Clause │
+│         tint  MIT          │
+└────────────────────────────┘
 ```
 
 ## Install
