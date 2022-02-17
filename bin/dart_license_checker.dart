@@ -110,24 +110,37 @@ void main(List<String> arguments) async {
 String formatLicenseName(LicenseFile license) {
   if (license.name == 'unknown') {
     return 'Unknown'.red();
-  } else if (copyleftOrProprietaryLicenses.indexWhere((name) => license.name.startsWith(name)) != -1) {
-    return license.shortFormatted.red();
-  } else if (permissiveLicenses.indexWhere((name) => license.name.startsWith(name)) != -1) {
+  } else if (isPermissiveLicenses(license)) {
     return license.shortFormatted.green();
+  } else if (isCopyleftOrProprietaryLicenses(license)) {
+    return license.shortFormatted.red();
   } else {
     return license.shortFormatted.yellow();
   }
 }
 
-// TODO LGPL, AGPL, MPL
+bool isCopyleftOrProprietaryLicenses(LicenseFile license) {
+  final index = copyleftOrProprietaryLicenses
+      .indexWhere((name) => license.name.startsWith(name));
+  return index != -1;
+}
+
+bool isPermissiveLicenses(LicenseFile license) {
+  final index =
+      permissiveLicenses.indexWhere((name) => license.name.startsWith(name));
+  return index != -1;
+}
 
 const permissiveLicenses = [
   'MIT',
   'BSD',
   'Apache',
+  'MPL',
   'Unlicense',
 ];
 
 const copyleftOrProprietaryLicenses = [
   'GPL',
+  'LGPL',
+  'AGPL',
 ];
