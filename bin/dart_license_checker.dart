@@ -119,6 +119,21 @@ String formatLicenseName(LicenseFile license) {
   }
 }
 
+const permissiveLicenses = [
+  'MIT',
+  'BSD',
+  'Apache',
+  'MPL',
+  'Zlib',
+  'Unlicense',
+];
+
+const copyleftOrProprietaryLicenses = [
+  'GPL',
+  'LGPL',
+  'AGPL',
+];
+
 bool isCopyleftOrProprietaryLicenses(LicenseFile license) {
   final index = copyleftOrProprietaryLicenses
       .indexWhere((name) => license.name.startsWith(name));
@@ -130,17 +145,3 @@ bool isPermissiveLicenses(LicenseFile license) {
       permissiveLicenses.indexWhere((name) => license.name.startsWith(name));
   return index != -1;
 }
-
-const permissiveLicenses = [
-  'MIT',
-  'BSD',
-  'Apache',
-  'MPL',
-  'Unlicense',
-];
-
-const copyleftOrProprietaryLicenses = [
-  'GPL',
-  'LGPL',
-  'AGPL',
-];
