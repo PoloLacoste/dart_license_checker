@@ -5,39 +5,94 @@ import 'dart:io';
 import 'package:pana/src/license.dart';
 
 // not importing pana due to http import errors
-import 'package:pana/src/model.dart';
 import 'package:pana/src/pubspec.dart';
 
-import 'package:barbecue/barbecue.dart';
+import 'package:args/args.dart';
 import 'package:tint/tint.dart';
 
-void main(List<String> arguments) async {
-  final showTransitiveDependencies =
-      arguments.contains('--show-transitive-dependencies');
-  final pubspecFile = File('pubspec.yaml');
+import 'src/writer.dart';
+import 'src/printer.dart';
+import 'src/utils.dart';
 
+void main(List<String> arguments) async {
+  final parser = ArgParser();
+  parser.addFlag(
+    showTransitiveDependenciesFlag,
+    defaultsTo: false,
+    help: 'Analyze transitive dependencies',
+  );
+  parser.addOption(
+    outputTypeOption,
+    abbr: 't',
+    allowed: [
+      WriterType.csv.name,
+      WriterType.xlsx.name,
+    ],
+    defaultsTo: WriterType.none.name,
+    help: 'Output type',
+  );
+  parser.addOption(
+    outputOption,
+    abbr: 'o',
+    defaultsTo: null,
+    help: 'Output file path (without type extension), default to "CurrentPackageName_licenses"',
+  );
+  parser.addFlag(
+    'help',
+    abbr: 'h',
+    negatable: false,
+  );
+  try {
+    final args = parser.parse(arguments);
+    if (args.wasParsed(helpFlag)) {
+      print('Dart license checker:');
+      print(parser.usage);
+      exit(0);
+    }
+    licenseChecker(args);
+  } catch (e) {
+    stderr.writeln(e.toString().red());
+    exit(1);
+  }
+}
+
+void licenseChecker(ArgResults args) async {
+  final showTransitiveDependencies =
+      args[showTransitiveDependenciesFlag] as bool;
+  final outputType = WriterType.values.byName(args[outputTypeOption] as String);
+  final output = args[outputOption] as String?;
+
+  print('Checking pubspec and package_config files...'.blue());
+
+  final pubspecFile = File('pubspec.yaml');
   if (!pubspecFile.existsSync()) {
     stderr.writeln('pubspec.yaml file not found in current directory'.red());
     exit(1);
   }
 
-  final pubspec = Pubspec.parseYaml(pubspecFile.readAsStringSync());
-
   final packageConfigFile = File('.dart_tool/package_config.json');
-
-  if (!pubspecFile.existsSync()) {
+  if (!packageConfigFile.existsSync()) {
     stderr.writeln(
-        '.dart_tool/package_config.json file not found in current directory. You may need to run "flutter pub get" or "pub get"'
+        '.dart_tool/package_config.json file not found in current directory.'
+                'You may need to run "flutter pub get" or "pub get"'
             .red());
     exit(1);
   }
 
-  print('Checking dependencies...'.blue());
-
+  final pubspec = Pubspec.parseYaml(pubspecFile.readAsStringSync());
   final packageConfig = json.decode(packageConfigFile.readAsStringSync());
 
-  final rows = <Row>[];
+  print('Checking dependencies...'.blue());
 
+  final printer = Printer();
+  final writer = Writer(
+    output: output,
+    packageName: pubspec.name,
+    type: outputType,
+  );
+  await writer.initialize();
+
+  var index = 0;
   for (final package in packageConfig['packages']) {
     final name = package['name'];
 
@@ -49,99 +104,22 @@ void main(List<String> arguments) async {
 
     String rootUri = package['rootUri'];
     if (rootUri.startsWith('file://')) {
-      rootUri = rootUri.substring(7);
+      rootUri = rootUri.substring(8);
     }
 
     final license = await detectLicenseInDir(rootUri);
 
     if (license != null) {
-      rows.add(Row(cells: [
-        Cell(name,
-            style: CellStyle(
-              alignment: TextAlignment.TopRight,
-            )),
-        Cell(formatLicenseName(license)),
-      ]));
+      printer.addLicense(name, license);
+      await writer.writeLicense(name, license, index);
     } else {
-      rows.add(Row(cells: [
-        Cell(name,
-            style: CellStyle(
-              alignment: TextAlignment.TopRight,
-            )),
-        Cell('No license file'.grey()),
-      ]));
+      printer.addNoLicense(name);
+      await writer.writeNoLicense(name, index);
     }
+    index++;
   }
-  print(
-    Table(
-      tableStyle: TableStyle(
-        border: true,
-      ),
-      header: TableSection(
-        rows: [
-          Row(
-            cells: [
-              Cell(
-                'Package Name  '.bold(),
-                style: CellStyle(
-                  alignment: TextAlignment.TopRight,
-                ),
-              ),
-              Cell('License'.bold()),
-            ],
-            cellStyle: CellStyle(
-              borderBottom: true,
-            ),
-          ),
-        ],
-      ),
-      body: TableSection(
-        cellStyle: CellStyle(
-          paddingRight: 2,
-        ),
-        rows: rows,
-      ),
-    ).render(),
-  );
+  printer.print();
+  await writer.save();
 
   exit(0);
-}
-
-String formatLicenseName(LicenseFile license) {
-  if (license.name == 'unknown') {
-    return 'Unknown'.red();
-  } else if (isPermissiveLicenses(license)) {
-    return license.shortFormatted.green();
-  } else if (isCopyleftOrProprietaryLicenses(license)) {
-    return license.shortFormatted.red();
-  } else {
-    return license.shortFormatted.yellow();
-  }
-}
-
-const permissiveLicenses = [
-  'MIT',
-  'BSD',
-  'Apache',
-  'MPL',
-  'Zlib',
-  'Unlicense',
-];
-
-const copyleftOrProprietaryLicenses = [
-  'GPL',
-  'LGPL',
-  'AGPL',
-];
-
-bool isCopyleftOrProprietaryLicenses(LicenseFile license) {
-  final index = copyleftOrProprietaryLicenses
-      .indexWhere((name) => license.name.startsWith(name));
-  return index != -1;
-}
-
-bool isPermissiveLicenses(LicenseFile license) {
-  final index =
-      permissiveLicenses.indexWhere((name) => license.name.startsWith(name));
-  return index != -1;
 }
